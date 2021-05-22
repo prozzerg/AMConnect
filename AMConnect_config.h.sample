@@ -1,0 +1,27 @@
+// Wifi settings
+const char* ssid = "wifi";
+const char* password = "password";
+
+// mqtt settings
+const char* mqtt_server = "YOUR_MQTT_BROKER_IP_ADDRESS";
+const char* mqtt_username = "username";
+const char* mqtt_password = "password";
+const char* mqtt_command_topic = "automower/command";
+const char* mqtt_debug_topic = "automower/debug";
+const char* mqtt_status_topic = "automower/status";
+const char* mqtt_location_topic = "automower/location";
+
+// Define the port used for serial communication with the AutoMower. 
+// Here we use Serial1, on pins 15 (RX) and 2 (TX)
+#define AMSerialRX 15
+#define AMSerialTX 2
+
+// Define the port used for GPS. In this case, Serial2 on default pins (RX 16, TX 17)
+#define gpsPort Serial2
+#define GPS_PORT_NAME "Serial2"
+
+// Define the debug serial port
+#define DEBUG_PORT Serial
+
+// Define the interval between position updates
+#define gpsInterval 10
