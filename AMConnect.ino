@@ -758,8 +758,8 @@ void handle_command(String command) {
   else if (command == "getBatteryTemperature") { memcpy(commandAutomower, amcGetBatteryTemperature, sizeof(commandAutomower)); }
   else if (command == "getBatteryLastChargingTime") { memcpy(commandAutomower, amcGetBatteryLastChargingTime, sizeof(commandAutomower)); }
   else if (command == "getBatteryChargingTemperature") { memcpy(commandAutomower, amcGetBatteryChargingTemperature, sizeof(commandAutomower)); }
-  else if (command == "getGetSpeedRight") { memcpy(commandAutomower, amcGetSpeedRight, sizeof(commandAutomower)); }
-  else if (command == "getGetSpeedLeft") { memcpy(commandAutomower, amcGetSpeedLeft, sizeof(commandAutomower)); }
+  else if (command == "getSpeedRight") { memcpy(commandAutomower, amcGetSpeedRight, sizeof(commandAutomower)); }
+  else if (command == "getSpeedLeft") { memcpy(commandAutomower, amcGetSpeedLeft, sizeof(commandAutomower)); }
   else if (command == "getBatteryCapacityUsed") { memcpy(commandAutomower, amcGetBatteryCapacityUsed, sizeof(commandAutomower)); }
   else if (command == "getSpeedKnife") { memcpy(commandAutomower, amcGetSpeedKnife, sizeof(commandAutomower)); }
   else if (command == "getBatteryVoltage") { memcpy(commandAutomower, amcGetBatteryVoltage, sizeof(commandAutomower)); }
