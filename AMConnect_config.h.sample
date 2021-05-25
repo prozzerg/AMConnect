@@ -25,3 +25,6 @@ const char* mqtt_location_topic = "automower/location";
 
 // Define the interval between position updates
 #define gpsInterval 10
+
+//Define the poll interval in seconds
+#define pollInterval 60
