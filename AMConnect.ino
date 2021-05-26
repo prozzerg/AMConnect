@@ -450,6 +450,9 @@ void handle_am() {
           case 12: //Status
             handle_status(statusInt, "No loop signal"); // Kein Schleifensignal
             break;
+	  case 16: //Status
+            handle_status(statusInt, "Outside working area");
+            break;
           case 18: //Status
             handle_status(statusInt, "Low battery voltage"); // Niedrige Batteriespannung
             break;
