@@ -20,6 +20,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>
+#include <uptime_formatter.h>
+
 
 // Include config
 #include "AMConnect_config.h"
@@ -30,22 +32,20 @@
 // Define the client
 WiFiClient espClient;
 PubSubClient client(espClient);
-long lastMsg = 0;
-char msg[50];
-int value = 0;
 
 Preferences preferences;
 
 // GPS variables
 NMEAGPS  gps; // This parses the GPS characters
 gps_fix  fix; // This holds on to the latest values
-unsigned long lastMillis;
-unsigned long currentMillis;
+
+// Timer variables for GPS polling
+unsigned long gpsMillis;
 unsigned int localGpsInterval;
-unsigned int localPollInterval;
 
 // Timer variables for status polling
 unsigned long pollMillis;
+unsigned int localPollInterval;
 
 uint8_t lastCommand[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }; 
 
@@ -72,8 +72,8 @@ void setup()
   // Start the GPS port
   gpsPort.begin(9600);
 
-  // Set lastMillis
-  lastMillis = millis();
+  // Set gpsMillis
+  gpsMillis = millis();
   pollMillis = millis();
 
   // start ArduinoOTA
@@ -128,13 +128,12 @@ void loop()
   while (gps.available( gpsPort )) {
     fix = gps.read();
     if (fix.valid.location) {
-      currentMillis = millis();
-      if (currentMillis - lastMillis >= localGpsInterval*1000) {
+      if (millis() - gpsMillis >= localGpsInterval*1000) {
         // Handle the GPS position
         handle_gps();
 
-        // Set lastMillis to currentMillis, so we know when gpsInterval has passed
-        lastMillis = currentMillis;
+        // Set gpsMillis to millis(), so we know when gpsInterval has passed
+        gpsMillis = millis();
       }
     }   
   }
@@ -291,14 +290,25 @@ void handle_debug(bool sendmqtt, String debugmsg) {
 void handle_status(int statusCode, String statusMsg) {
   // Send to debug
   handle_debug(true, statusMsg);
-
   
-  // send to mqtt_command_topic
+  // send to mqtt_status_topic
   if (client.connected())
   {
-    char statusSChar[50];
-    statusMsg.toCharArray(statusSChar,50);
-    client.publish(mqtt_status_topic, statusSChar);
+    char statusChar[50];
+    statusMsg.toCharArray(statusChar,50);
+    client.publish(mqtt_status_topic, statusChar);
+  }
+}
+
+void handle_uptime() {
+  String uptime = "Up " + (String)uptime_formatter::getUptime();
+  
+  // send to mqtt_debug_topic
+  if (client.connected())
+  {
+    char statusChar[50];
+    uptime.toCharArray(statusChar,50);
+    client.publish(mqtt_debug_topic, statusChar);
   }
 }
 
@@ -311,7 +321,9 @@ void handle_am() {
 	if(memcmp(statusAutomower, empty, 5) == 0) 
 	{
     handle_debug(true, "Unusable data received on serial");
-	} else {
+	} 
+	else 
+	{
     // values comes as DEC and not HEX
     handle_debug(true, "Byte1: " + (String)(statusAutomower[0]) + " Byte2: " + (String)(statusAutomower[1]) + " Byte3: " + (String)(statusAutomower[2]) + " Byte4: " + (String)(statusAutomower[3]) + " Byte5: " + (String)(statusAutomower[4]));
    
@@ -501,7 +513,7 @@ void handle_am() {
           case 12: //Status
             handle_status(statusInt, "No loop signal"); // Kein Schleifensignal
             break;
-	  case 16: //Status
+          case 16: //Status
             handle_status(statusInt, "Outside working area");
             break;
           case 18: //Status
@@ -834,6 +846,7 @@ void handle_preferences(String preferencePayload) {
 }
 
 void handle_command(String command) {
+  bool dowrite = true;
   uint8_t commandAutomower[5] = { 0x0F, 0x01, 0xF1, 0x00, 0x00 };
 
   if (command == "getMowingTime") { memcpy(commandAutomower, amcGetMowingTime, sizeof(commandAutomower)); }
@@ -904,8 +917,12 @@ void handle_command(String command) {
   else if (command == "setModeDemo") { memcpy(commandAutomower, amcModeDemo, sizeof(commandAutomower)); }
   else if (command == "setTimerActivate") { memcpy(commandAutomower, amcTimerActivate, sizeof(commandAutomower)); }
   else if (command == "setTimerDeactivate") { memcpy(commandAutomower, amcTimerDeactivate, sizeof(commandAutomower)); }
-    
-  // send it to the automower
-  Serial1.write(commandAutomower,sizeof(commandAutomower));
+  else if (command == "getUptime") { handle_uptime(); dowrite = false; }
+
+  if (dowrite)
+  {
+    // send it to the automower
+    Serial1.write(commandAutomower,sizeof(commandAutomower));
+  }
   
 }
