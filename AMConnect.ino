@@ -162,7 +162,7 @@ void loop()
 void savePreferences() 
 {
     preferences.begin("amPreferences", false);
-    if(readStoredPreferences == 0)
+    if(readStoredPreferences == 1)
     {
       handle_debug(false, (String)"Using stored values from preferences, skipping config values...");
       
