@@ -19,6 +19,7 @@
 #include <PubSubClient.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <Preferences.h>
 
 // Include config
 #include "AMConnect_config.h"
@@ -33,11 +34,15 @@ long lastMsg = 0;
 char msg[50];
 int value = 0;
 
+Preferences preferences;
+
 // GPS variables
 NMEAGPS  gps; // This parses the GPS characters
 gps_fix  fix; // This holds on to the latest values
 unsigned long lastMillis;
 unsigned long currentMillis;
+unsigned int localGpsInterval;
+unsigned int localPollInterval;
 
 // Timer variables for status polling
 unsigned long pollMillis;
@@ -101,6 +106,9 @@ void setup()
     });
 
     ArduinoOTA.begin();
+
+    // Read/Save preferences at startup
+    savePreferences();
 }
 
 //--------------------------
@@ -121,7 +129,7 @@ void loop()
     fix = gps.read();
     if (fix.valid.location) {
       currentMillis = millis();
-      if (currentMillis - lastMillis >= gpsInterval*1000) {
+      if (currentMillis - lastMillis >= localGpsInterval*1000) {
         // Handle the GPS position
         handle_gps();
 
@@ -138,7 +146,7 @@ void loop()
   }
 
   // Poll mower for status
-  if (millis() - pollMillis >= pollInterval*1000) 
+  if (millis() - pollMillis >= localPollInterval*1000) 
   {
     // do a poll for status
     handle_command("getStatus");
@@ -151,6 +159,37 @@ void loop()
 }
 
 // Functions
+
+void savePreferences() 
+{
+    preferences.begin("amPreferences", false);
+    if(readStoredPreferences == 0)
+    {
+      handle_debug(false, (String)"Using stored values from preferences, skipping config values...");
+      
+      //Poll-interval
+      localPollInterval = preferences.getUInt("pollInterval");
+      handle_debug(true, "stored pollInterval is set to: " + preferences.getUInt("pollInterval"));
+      
+      // GPS-interval
+      localGpsInterval = preferences.getUInt("gpsInterval");
+      handle_debug(true, "stored gpsInterval is set to: " + preferences.getUInt("gpsInterval"));
+    }
+    else
+    {
+      handle_debug(false, (String)"Using values from config, overwriting preferences...");
+
+      //Poll-interval
+      preferences.putUInt("pollInterval", pollInterval);
+      localPollInterval = pollInterval;
+      
+      // GPS-interval
+      preferences.putUInt("gpsInterval", gpsInterval);
+      localGpsInterval = gpsInterval;
+    }
+    preferences.end();
+}
+
 void setup_wifi() {
   delay(10);
   // We start by connecting to a WiFi network
@@ -168,32 +207,44 @@ void setup_wifi() {
   handle_debug(false, (String)"WiFi connected. IP Address: " + (String)WiFi.localIP()); 
 }
 
+
 void callback(char* topic, byte* message, unsigned int length) {
   String messageTemp;
-  
+
   for (int i = 0; i < length; i++) {
     messageTemp += (char)message[i];
   }
-  
+
   handle_debug(false, (String)"Message arrived on topic: " + (String)topic + (String)". Message: " + (String)messageTemp);
-  
+
+  //Commands
   if ((String)topic == (String)mqtt_command_topic) {
     // We got a command, lets handle it!
     handle_command(messageTemp);
-    
-	  handle_debug(false, "Got command via MQTT");
+
+    handle_debug(false, "Got command via MQTT");
+  }
+
+  //Preferences
+  if ((String)topic == (String)mqtt_preferences_topic) {
+    // We got a command, lets handle it!
+    handle_preferences(messageTemp);
+
+    handle_debug(false, "Got a preference via MQTT");
   }
 }
 
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
-	  handle_debug(false, "Attempting MQTT connection...");
+    handle_debug(false, "Attempting MQTT connection...");
     // Attempt to connect
     if (client.connect("AMClient", mqtt_username, mqtt_password)) {
-	    handle_debug(false, "MQTT connected");
-      // Subscribe
+      handle_debug(false, "MQTT connected");
+      // Subscribe to commands
       client.subscribe(mqtt_command_topic);
+      //Subscribe to preferences
+      client.subscribe(mqtt_preferences_topic);
     } else {
       handle_debug(false, (String)"MQTT failed, rc=" + (String)client.state() + (String)". Try again in 5 seconds");
       // Wait 5 seconds before retrying
@@ -744,6 +795,43 @@ void handle_am() {
   }
 }
 
+void handle_preferences(String preferencePayload) {
+  preferences.begin("amPreferences", false);
+
+  if(preferencePayload.startsWith("gpsInterval:")) 
+  { 
+    preferences.putUInt("gpsInterval", preferencePayload.substring(12).toInt());
+    localGpsInterval = preferencePayload.substring(12).toInt();
+    handle_debug(true, "gpsInterval is set to: " + String(preferences.getUInt("gpsInterval")));  }
+    
+  else if (preferencePayload.startsWith("pollInterval:"))
+  { 
+    preferences.putUInt("pollInterval", preferencePayload.substring(13).toInt());
+    localPollInterval = preferencePayload.substring(13).toInt();
+    handle_debug(true, "pollInterval is set to: " + String(preferences.getUInt("pollInterval")));  }
+    
+  else if( preferencePayload == "getGpsInterval")
+  { 
+    const byte gpsSize =  sizeof localGpsInterval;
+    char gpsChar[gpsSize];
+    itoa(localGpsInterval, gpsChar, 10);
+    client.publish(mqtt_prefstatus_topic, gpsChar);
+    handle_debug(true, "gpsInterval is set to: " + String(preferences.getUInt("gpsInterval"))); }
+    
+  else if( preferencePayload = "getPollInterval")
+  {
+    const byte pollSize =  sizeof localPollInterval;
+    char pollChar[pollSize];
+    itoa(localPollInterval, pollChar, 10);
+    client.publish(mqtt_prefstatus_topic, pollChar); 
+    handle_debug(true, "pollInterval is set to: " + String(preferences.getUInt("pollInterval"))); }
+    
+  else 
+  {
+    handle_debug(true, "Unknown command recieved on automower/preferences topic: " + preferencePayload); }
+  
+  preferences.end();
+}
 
 void handle_command(String command) {
   uint8_t commandAutomower[5] = { 0x0F, 0x01, 0xF1, 0x00, 0x00 };
