@@ -28,3 +28,9 @@ const char* mqtt_location_topic = "automower/location";
 
 //Define the poll interval in seconds
 #define pollInterval 60
+
+// Defines if the values for pollInterval & gpsInterval should be read from internal memory in the device
+// 1 = read internal values, 0 = overwrite internal values with config-readInternalValues
+// This can be used for setting the values over MQTT by sending pollInterval:xx on topic automower/preferences
+// and is stored in the device after a reboot.
+#define readStoredPreferences 0 
