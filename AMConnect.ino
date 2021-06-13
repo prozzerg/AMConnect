@@ -238,12 +238,14 @@ void reconnect() {
   while (!client.connected()) {
     handle_debug(false, "Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("AMClient", mqtt_username, mqtt_password)) {
+    if (client.connect("AMClient", mqtt_username, mqtt_password, mqtt_lwt_topic, 1, true, "Offline")) {
       handle_debug(false, "MQTT connected");
       // Subscribe to commands
       client.subscribe(mqtt_command_topic);
-      //Subscribe to preferences
+      // Subscribe to preferences
       client.subscribe(mqtt_preferences_topic);
+      // Set LWT to Online
+      client.publish(mqtt_lwt_topic, "Online");
     } else {
       handle_debug(false, (String)"MQTT failed, rc=" + (String)client.state() + (String)". Try again in 5 seconds");
       // Wait 5 seconds before retrying
