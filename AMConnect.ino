@@ -245,7 +245,7 @@ void reconnect() {
       // Subscribe to preferences
       client.subscribe(mqtt_preferences_topic);
       // Set LWT to Online
-      client.publish(mqtt_lwt_topic, "Online");
+      client.publish(mqtt_lwt_topic, "Online", true);
     } else {
       handle_debug(false, (String)"MQTT failed, rc=" + (String)client.state() + (String)". Try again in 5 seconds");
       // Wait 5 seconds before retrying
