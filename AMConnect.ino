@@ -521,6 +521,9 @@ void handle_am() {
           case 18: //Status
             handle_status(statusInt, "Low battery voltage"); // Niedrige Batteriespannung
             break;
+          case 24: //Status
+            handle_status(statusInt, "Wheel spinning"); 
+            break;
           case 26: //Status
             handle_status(statusInt, "Charging station blocked"); // Ladestation blockiert
             break;
