@@ -536,6 +536,9 @@ void handle_am() {
           case 54: //Status
             handle_status(statusInt, "Pin expired"); // Pin abgelaufen
             break;
+          case 56: //Status
+            handle_status(statusInt, "Left collision sensor defective"); 
+            break;
           case 1000: //Status
             handle_status(statusInt, "Leaves charging station"); // Verlässt Ladestation
             break;
