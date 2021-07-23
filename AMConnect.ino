@@ -539,6 +539,9 @@ void handle_am() {
           case 56: //Status
             handle_status(statusInt, "Left collision sensor defective"); 
             break;
+          case 58: //Status
+            handle_status(statusInt, "Right collision sensor defective"); 
+            break;
           case 1000: //Status
             handle_status(statusInt, "Leaves charging station"); // Verlässt Ladestation
             break;
