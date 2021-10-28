@@ -524,6 +524,9 @@ void handle_am() {
           case 24: //Status
             handle_status(statusInt, "Wheel spinning"); 
             break;
+          case 28: //Status
+            handle_status(statusInt, "Manual charging needed"); // Ladestation blockiert
+            break;
           case 26: //Status
             handle_status(statusInt, "Charging station blocked"); // Ladestation blockiert
             break;
