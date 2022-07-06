@@ -1,0 +1,7 @@
+{
+    "port": "/dev/tty.usbserial-AB0LYA07",
+    "configuration": "FlashFreq=80,UploadSpeed=921600,DebugLevel=none,PartitionScheme=default",
+    "board": "esp32:esp32:featheresp32",
+    "sketch": "AMConnect.ino",
+    "output": "../build"
+}
