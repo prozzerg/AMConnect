@@ -48,6 +48,7 @@ unsigned long pollMillis;
 unsigned int localPollInterval;
 
 uint8_t lastCommand[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+static bool AMPresent = false;
 
 void setup()
 {
@@ -119,9 +120,14 @@ void setup()
 // Main loop
 void loop()
 {
+  // Chack if WiFi is connected
+  if (WiFi.status() != WL_CONNECTED) {
+    wifi_reconnect();
+  }
+
   // Check if MQTT is connected
   if (!client.connected()) {
-    reconnect();
+    mqtt_reconnect();
   }
   // Do the MQTT Client Loop
   client.loop();
@@ -152,6 +158,9 @@ void loop()
   {
     // do a poll for status
     handle_command("getStatus");
+
+    // do a poll for Wifi RSSI
+    handle_command("getWifiRssi");
 
     pollMillis = millis();
   }
@@ -192,13 +201,21 @@ void savePreferences()
     preferences.end();
 }
 
+String ip2Str(IPAddress ip){
+  String ip_str="";
+  for (int i=0; i<4; i++) {
+    ip_str += i  ? "." + String(ip[i]) : String(ip[i]);
+  }
+  return ip_str;
+}
+
 void setup_wifi() {
   delay(10);
   // We start by connecting to a WiFi network
   handle_debug(false, "");
   handle_debug(false, (String)"Connecting to: " + (String)ssid);
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password, 0);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -206,9 +223,8 @@ void setup_wifi() {
   }
 
   handle_debug(false, "");
-  handle_debug(false, (String)"WiFi connected. IP Address: " + (String)WiFi.localIP());
+  handle_debug(false, (String)"WiFi connected. IP Address: " + ip2Str(WiFi.localIP()));
 }
-
 
 void callback(char* topic, byte* message, unsigned int length) {
   String messageTemp;
@@ -236,9 +252,26 @@ void callback(char* topic, byte* message, unsigned int length) {
   }
 }
 
-void reconnect() {
+void wifi_reconnect() {
+  // Loop until we're reconnected
+  while ((WiFi.status() != WL_CONNECTED)) {
+    handle_debug(false, "Reconnecting to WiFi...");
+    WiFi.disconnect();
+    WiFi.reconnect();
+    if (WiFi.status() != WL_CONNECTED) {
+      delay(5000);
+    }
+  }
+}
+
+void mqtt_reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
+    // Abort if no WiFi status not connected
+    if (WiFi.status() != WL_CONNECTED) {
+      return;
+    }
+
     handle_debug(false, "Attempting MQTT connection...");
     // Attempt to connect
     if (client.connect("AMClient", mqtt_username, mqtt_password, mqtt_lwt_topic, 1, true, "Offline")) {
@@ -264,7 +297,6 @@ void handle_gps() {
   char longitudeString[10];
   dtostrf(fix.longitude(), 0, 6, longitudeString);
 
-
   const byte latitudeSize =  sizeof latitudeString;
   const byte longitudeSize =  sizeof longitudeString;
   const byte positionSize = latitudeSize + longitudeSize + 1;
@@ -282,7 +314,6 @@ void handle_debug(bool sendmqtt, String debugmsg) {
   // Handle the debug output
   DEBUG_PORT.println(debugmsg);
 
-
   // send to mqtt_command_topic
   if (sendmqtt && client.connected())
   {
@@ -290,6 +321,13 @@ void handle_debug(bool sendmqtt, String debugmsg) {
     debugmsg.toCharArray(debugChar,50);
     client.publish(mqtt_debug_topic, debugChar);
   }
+}
+
+void handle_wifirssi() {
+  String wifirssi = "Wifi RSSI (dBm): " + (String)WiFi.RSSI();
+
+  // Send to debug
+  handle_debug(true, wifirssi);
 }
 
 void handle_status(int statusCode, String statusMsg) {
@@ -318,21 +356,22 @@ void handle_uptime() {
 }
 
 void handle_am() {
-	uint8_t statusAutomower[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-	uint8_t empty[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+  uint8_t statusAutomower[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+  uint8_t empty[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
-	Serial1.readBytes(statusAutomower,5);
+  Serial1.readBytes(statusAutomower,5);
 
-	if(memcmp(statusAutomower, empty, 5) == 0)
-	{
+  if(memcmp(statusAutomower, empty, 5) == 0)
+  {
     handle_debug(true, "Unusable data received on serial");
-	}
-	else
-	{
+    AMPresent = false;
+  }
+  else
+  {
     // values comes as DEC and not HEX
     handle_debug(true, "Byte1: " + (String)(statusAutomower[0]) + " Byte2: " + (String)(statusAutomower[1]) + " Byte3: " + (String)(statusAutomower[2]) + " Byte4: " + (String)(statusAutomower[3]) + " Byte5: " + (String)(statusAutomower[4]));
-
-	}
+    AMPresent = true;
+  }
 
   // Merge the last two bytes to status
   unsigned int statusInt = statusAutomower[4] << 8 | statusAutomower[3];
@@ -348,7 +387,7 @@ void handle_am() {
       if (statusAutomower[2] == 0x5F)
       {
         // Keypress
-		    switch (statusInt) {
+        switch (statusInt) {
           case 0:
             handle_debug(true, "Key 0 pressed");
             break;
@@ -358,52 +397,52 @@ void handle_am() {
           case 2:
             handle_debug(true, "Key 2 pressed");
             break;
-		      case 3:
+          case 3:
             handle_debug(true, "Key 3 pressed");
             break;
-	        case 4:
+          case 4:
             handle_debug(true, "Key 4 pressed");
             break;
-		      case 5:
+          case 5:
             handle_debug(true, "Key 5 pressed");
             break;
-		      case 6:
+          case 6:
             handle_debug(true, "Key 6 pressed");
             break;
-		      case 7:
+          case 7:
             handle_debug(true, "Key 7 pressed");
             break;
-		      case 8:
+          case 8:
             handle_debug(true, "Key 8 pressed");
             break;
-		      case 9:
+          case 9:
             handle_debug(true, "Key 9 pressed");
             break;
-		      case 10:
+          case 10:
             handle_debug(true, "Key Program A pressed");
             break;
-		      case 11:
+          case 11:
             handle_debug(true, "Key Program B pressed");
             break;
-		      case 12:
+          case 12:
             handle_debug(true, "Key Program C pressed");
             break;
-		      case 13:
+          case 13:
             handle_debug(true, "Key Home pressed");
             break;
-		      case 14:
+          case 14:
             handle_debug(true, "Key Man/Auto pressed");
             break;
-		      case 15:
+          case 15:
             handle_debug(true, "Key C pressed");
             break;
-		      case 16:
+          case 16:
             handle_debug(true, "Key Up pressed");
             break;
-		      case 17:
+          case 17:
             handle_debug(true, "Key Down pressed");
             break;
-		      case 18:
+          case 18:
             handle_debug(true, "Key YES pressed");
             break;
           default: //no valid parameter: send status
@@ -428,7 +467,7 @@ void handle_am() {
           case 3:
             handle_debug(true, "Home Mode");
             break;
-		      case 4:
+          case 4:
             handle_debug(true, "Demo Mode");
             break;
           default: //no valid parameter: send status
@@ -443,7 +482,7 @@ void handle_am() {
       if (statusAutomower[2] == 0x4E)
       {
         // Timer actions
-		    switch (statusInt) {
+        switch (statusInt) {
           case 0:
             handle_debug(true, "Timer activated");
             break;
@@ -863,7 +902,7 @@ void handle_preferences(String preferencePayload) {
 }
 
 void handle_command(String command) {
-  bool dowrite = true;
+  bool AMCmd = true;
   uint8_t commandAutomower[5] = { 0x0F, 0x01, 0xF1, 0x00, 0x00 };
 
   if (command == "getMowingTime") { memcpy(commandAutomower, amcGetMowingTime, sizeof(commandAutomower)); }
@@ -934,12 +973,12 @@ void handle_command(String command) {
   else if (command == "setModeDemo") { memcpy(commandAutomower, amcModeDemo, sizeof(commandAutomower)); }
   else if (command == "setTimerActivate") { memcpy(commandAutomower, amcTimerActivate, sizeof(commandAutomower)); }
   else if (command == "setTimerDeactivate") { memcpy(commandAutomower, amcTimerDeactivate, sizeof(commandAutomower)); }
-  else if (command == "getUptime") { handle_uptime(); dowrite = false; }
+  else if (command == "getUptime") { handle_uptime(); AMCmd = false; }
+  else if (command == "getWifiRssi") { handle_wifirssi(); AMCmd = false; }
 
-  if (dowrite)
+  if ((true == AMPresent) && (true == AMCmd))
   {
     // send it to the automower
     Serial1.write(commandAutomower,sizeof(commandAutomower));
   }
-
 }
