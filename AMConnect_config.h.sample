@@ -14,12 +14,13 @@ const char* mqtt_preferences_topic = "automower/preferences";
 const char* mqtt_prefstatus_topic = "automower/prefstatus";
 const char* mqtt_lwt_topic = "automower/lwt";
 
-// Define the port used for serial communication with the AutoMower. 
+// Define the port used for serial communication with the AutoMower.
 // Here we use Serial1, on pins 15 (RX) and 2 (TX)
 #define AMSerialRX 15
 #define AMSerialTX 2
 
-// Define the port used for GPS. In this case, Serial2 on default pins (RX 16, TX 17)
+// Define if GPS attached (true/false) and the port used for GPS. In this case, Serial2 on default pins (RX 16, TX 17)
+#define GPS_ATTACHED true
 #define gpsPort Serial2
 #define GPS_PORT_NAME "Serial2"
 
@@ -36,4 +37,4 @@ const char* mqtt_lwt_topic = "automower/lwt";
 // 1 = read internal values, 0 = overwrite internal values with config-readInternalValues
 // This can be used for setting the values over MQTT by sending pollInterval:xx on topic automower/preferences
 // and is stored in the device after a reboot.
-#define readStoredPreferences 0 
+#define readStoredPreferences 0
